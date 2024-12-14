@@ -63,9 +63,7 @@ log() {
     local level=$(lower $1)
     shift
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    local lineno=${BASH_LINENO[${#BASH_LINENO[@]}-1]}
-    println cyan "当前行号: $lineno"
-    println cyan ${BASH_LINENO[@]}
+    local lineno=${BASH_LINENO[0]}
     local message=$@
     local color
     local exit_code=0
