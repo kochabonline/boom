@@ -163,7 +163,7 @@ option() {
                 ;;
             *)
                 if $extra_option $@; then
-                    shift
+                    shift 2
                 else
                     log error "unknown option: $1"
                 fi 
@@ -250,17 +250,16 @@ detect() {
 
     log debug "${cmd}"
 
+    local tmpfile
+    tmpfile=$(mktemp)
     if [ "$QUIET" == "true" ]; then
-        output=$(eval "$cmd" 2>&1)
-        exit=$?
+        eval "$cmd" &> "$tmpfile"
     else
-        local tmpfile
-        tmpfile=$(mktemp)
         eval "$cmd" &> >(tee "$tmpfile")
-        exit=${PIPESTATUS[0]}
-        output=$(<"$tmpfile")
-        rm -f "$tmpfile" &> /dev/null
     fi
+    exit=${PIPESTATUS[0]}
+    output=$(<"$tmpfile")
+    rm -f "$tmpfile" &> /dev/null
 
     if [ $exit -eq 0 ]; then
         [ -n "$__stdout" ] && eval "$__stdout=\$output"
