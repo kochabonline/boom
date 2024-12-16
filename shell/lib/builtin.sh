@@ -217,18 +217,25 @@ args() {
 }
 
 # 执行探测
-# detect <command> -v|--var <var>
+# detect <command> -v|--var <var> -e|--exception <var>
 detect() {
     local cmd
     local output
     local exit
     local __stdout
+    local __exception
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             -v|--var)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
                     __stdout=$2
+                    shift
+                fi
+                ;;
+            -e|--exception)
+                if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+                    __exception=$2
                     shift
                 fi
                 ;;
@@ -258,6 +265,7 @@ detect() {
     if [ $exit -eq 0 ]; then
         [ -n "$__stdout" ] && eval "$__stdout=\$output"
     else
+        [ -n "$__exception" ] && eval "$__exception=\$output" && return
         log error "execution command (${cmd}) failed: ${output}"
     fi
 }
@@ -565,8 +573,7 @@ publicip() {
 ip2country() {
     local ip=$(publicip)
 
-    cmdexs jq || pkg install jq
     local response=$(curl -sS "https://ipinfo.io/${ip}/json")
-    local country=$(echo "${response}" | jq -r '.country')
+    local country=$(echo "${response}" | grep -o '"country": *"[^"]*"' | sed 's/"country": *"\([^"]*\)"/\1/')
     printf -- "%s" "${country}"
 }
