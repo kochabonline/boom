@@ -14,6 +14,8 @@ LOG_LEVEL=${LOG_LEVEL:-"info"} # debug, info, warn, error
 LOG_FILE=${LOG_FILE:-"/var/log/$(basename -s .sh $0).log"}
 # 额外帮助信息
 EXTRA_HELP=${EXTRA_HELP:-""}
+# 额外选项处理函数参数偏移量
+EXTRA_SHIFT=${EXTRA_SHIFT:-""}
 
 
 # ----------内置函数----------
@@ -60,6 +62,7 @@ println() {
 # 日志输出
 # log <level> <message>
 log() {
+    local xtrace=$(shopt -po xtrace); set +x
     local level=$(lower $1)
     shift
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
@@ -85,6 +88,7 @@ log() {
     esac
 
     [ $exit_code -ne 0 ] && exit $exit_code
+    eval $xtrace
 }
 
 # 信号处理
@@ -163,7 +167,8 @@ option() {
                 ;;
             *)
                 if $extra_option $@; then
-                    shift 2
+                    [ -n "$EXTRA_SHIFT" ] && shift $EXTRA_SHIFT
+                    [ -z "$EXTRA_SHIFT" ] && shift
                 else
                     log error "unknown option: $1"
                 fi 

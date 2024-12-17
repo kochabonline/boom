@@ -34,10 +34,24 @@ option $@
 
 ```bash
 # 扩展帮助信息
-EXTRA_HELP=""
+EXTRA="false"
+ANOTHER=""
+EXTRA_HELP="  -e, --extra    <arg>           extra argument
+  -a, --another  <arg>           another argument
+"
 extra_option() {
     case $1 in
         -e|--extra)
+            EXTRA="true"
+            EXTRA_SHIFT=1 # 必须要返回shift的个数, 否则无法移动参数
+            ;;
+        -a|--another)
+            if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+                ANOTHER=$2
+                EXTRA_SHIFT=2 # 必须要返回shift的个数, 否则无法移动参数
+            else
+                log error "-a|--another requires a non-empty argument"
+            fi
             ;;
         *)
             return 1
