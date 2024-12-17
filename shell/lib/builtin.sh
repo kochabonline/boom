@@ -468,6 +468,9 @@ pkg() {
         centos|rocky|fedora|rhel)
             cmd="yum $flag $package -y"
             ;;
+        alpine)
+            cmd="apk update; apk $flag $package"
+            ;;
         *)
             log error "暂不支持该系统${os}"
             ;;
