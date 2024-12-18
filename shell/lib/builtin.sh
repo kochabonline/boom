@@ -178,7 +178,7 @@ option() {
 }; [[ ${BASH_SOURCE[0]} == ${0} ]] && option $@
 
 # 参数解析
-# args <param> <args> -d|--default <default> -v|--var <var>
+# args <param> <args> -d|--default <default> -v|--var <var> -r|--required
 args() {
     local param=$1
     shift
@@ -572,7 +572,7 @@ privateip() {
 
 # 公网 IP 地址
 publicip() {
-    local ip=$(curl -sS ifconfig.me)
+    local ip=$(curl -sS https://ipinfo.io/ip)
     printf -- "%s" "${ip}"
 }
 
