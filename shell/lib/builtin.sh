@@ -489,6 +489,29 @@ download() {
     QUIET=false detect $cmd
 }
 
+# json转换关联数组
+# json2array <data> <array>
+json2array() {
+    local __data=$1
+    local array=$2
+    local prefix=$3
+    local result
+    local key
+    local value
+
+    cmdexs jq || pkg install jq
+    result=$(echo $__data | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]')
+
+    for item in $result; do
+        key=$(echo $item | cut -d= -f1)
+        value=$(echo $item | cut -d= -f2-)
+        if [[ $value == \{* ]]; then
+            json2array "$value" $array "${prefix}${key}."
+        fi
+        eval $array[${prefix}${key}]=\"$value\"
+    done
+}
+
 # 交互式输入
 # input <message> var -d|--default <default>
 input() {
