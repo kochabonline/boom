@@ -32,27 +32,25 @@ telegram() {
 }
 
 # 发送钉钉消息 
-# dingtalk <message> -t|--token <token> -s|--secret <secret> -m|--mode <mode>
+# dingtalk <message> -w|--webhook <webhook> -s|--secret <secret> -m|--mode <mode>
 dingtalk() {
-    local baseurl="https://oapi.dingtalk.com/robot/send?access_token="
     local message=$1
-    args "-t|--token" $@ -r -v token
+    args "-w|--webhook" $@ -r -v webhook
     args "-s|--secret" $@ -v secret
     args "-m|--mode" $@ -d "markdown" -v mode
     local url
     local data
 
-    if [ -z "$secret" ]; then
-        url="${baseurl}${token}"
-    else
+    url="${webhook}"
+    if [ ! -z "$secret" ]; then
         local timestamp=$(date +%s%3N)
         local sign=$(echo -ne "${timestamp}\n${secret}" | openssl dgst -sha256 -hmac "${secret}" -binary | base64)
-        url="${baseurl}${token}&timestamp=${timestamp}&sign=${sign}"        
+        url="${webhook}&timestamp=${timestamp}&sign=${sign}"        
     fi
 
     case $mode in
         markdown)
-            local data="{\"msgtype\": \"markdown\", \"markdown\": {\"title\": \"你有一条新的消息,请注意查收\", \"text\": \"${message}\"}}"
+            local data="{\"msgtype\": \"markdown\", \"markdown\": {\"title\": \"你有一条新的消息\", \"text\": \"${message}\"}}"
             ;;
         text)
             local data="{\"msgtype\": \"text\", \"text\": {\"content\": \"${message}\"}}"
@@ -67,20 +65,25 @@ dingtalk() {
 }
 
 # 发送飞书消息
-# lark <message> -t|--token <token> -m|--mode <mode>
+# lark <message> -w|--webhook <webhook> -s|--secret <secret> -m|--mode <mode>
 lark() {
-    local baseurl="https://open.feishu.cn/open-apis/bot/v2/hook/"
     local message=$1
-    args "-t|--token" $@ -r -v token
+    args "-w|--webhook" $@ -r -v webhook
+    args "-s|--secret" $@ -v secret
     args "-m|--mode" $@ -d "markdown" -v mode
     local url
     local data
 
-    url="${baseurl}${token}"
+    url="${webhook}"
+    if [ ! -z "$secret" ]; then
+        local timestamp=$(date +%s%3N)
+        local sign=$(echo -ne "${timestamp}\n${secret}" | openssl dgst -sha256 -hmac "${secret}" -binary | base64)
+        url="${webhook}&timestamp=${timestamp}&sign=${sign}"        
+    fi
 
     case $mode in
         markdown)
-            local data="{\"msg_type\": \"interactive\", \"card\": {\"config\": {\"wide_screen_mode\": true}, \"elements\": [{\"tag\": \"div\", \"text\": {\"content\": \"${message}\", \"tag\": \"lark_md\"}}]}}"
+            local data="{\"msg_type\": \"post\", \"content\": {\"post\": {\"zh_cn\": {\"title\": \"你有一条新的消息\", \"content\": [[\"text\", \"${message}\"]]}}}}"
             ;;
         text)
             local data="{\"msg_type\": \"text\", \"content\": {\"text\": \"${message}\"}}"

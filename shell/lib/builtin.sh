@@ -183,7 +183,7 @@ args() {
     local param=$1
     shift
     local default
-    local var
+    local __var
     local value
     local required
 
@@ -197,7 +197,7 @@ args() {
                 ;;
             -v|--var)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    var="$2"
+                    __var="$2"
                     shift
                 fi
                 ;;
@@ -218,7 +218,7 @@ args() {
         log error "missing required argument: $param"
     fi
     
-    [ -n "$var" ] && eval $var=${value:-$default} || printf -- "%s" "${value:-$default}"
+    [ -n "$__var" ] && eval $__var=${value:-$default} || printf -- "%s" "${value:-$default}"
 }
 
 # 执行探测
@@ -304,7 +304,7 @@ cmdexs() {
     if eval type type > /dev/null 2>&1; then
         eval type "$cmd" > /dev/null 2>&1
     elif command > /dev/null 2>&1; then
-        command -v "$cmd"
+        command -v "$cmd" > /dev/null 2>&1
     else
         which "$cmd" > /dev/null 2>&1
     fi
@@ -347,13 +347,12 @@ progress() {
 destruct() {
     local array=($1)
     shift
-    local var
     local i=0
-    for var in "$@"; do
+    for __var in "$@"; do
         if [ $i -eq $(($# - 1)) ]; then
-            eval $var=$(echo -e \${array[@]:$i})
+            eval $__var=$(echo -e \${array[@]:$i})
         else
-            eval $var=${array[$i]}
+            eval $__var=${array[$i]}
         fi
         i=$((i+1))
     done
@@ -492,23 +491,23 @@ download() {
 # json转换关联数组
 # json2array <data> <array>
 json2array() {
-    local __data=$1
-    local array=$2
+    local data=$1
+    local __array=$2
     local prefix=$3
     local result
     local key
     local value
 
     cmdexs jq || pkg install jq
-    result=$(echo $__data | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]')
+    result=$(echo $data | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]')
 
     for item in $result; do
         key=$(echo $item | cut -d= -f1)
         value=$(echo $item | cut -d= -f2-)
         if [[ $value == \{* ]]; then
-            json2array "$value" $array "${prefix}${key}."
+            json2array "$value" $__array "${prefix}${key}."
         fi
-        eval $array[${prefix}${key}]=\"$value\"
+        eval $__array[${prefix}${key}]=\"$value\"
     done
 }
 
@@ -516,7 +515,7 @@ json2array() {
 # input <message> var -d|--default <default>
 input() {
     local message=$1
-    local var=$2
+    local __var=$2
     shift 2
     local input
 
@@ -524,7 +523,7 @@ input() {
     message=$(rightpadonespace "$message")
     local text=$(println cyan "$message")
     read -p "$text" input
-    eval $var=${input:-$default}
+    eval $__var=${input:-$default}
 }
 
 # 交互式选择
@@ -532,7 +531,7 @@ input() {
 iselect() {
     local message=$1
     local options=($2)
-    local var=$3
+    local __var=$3
     shift 3
     local input
 
@@ -540,7 +539,7 @@ iselect() {
     PS3=$(println cyan "$message")
     select option in "${options[@]}"; do
         if [ -n "$option" ]; then
-            eval $var=$option
+            eval $__var=$option
             break
         else
             println red "无效选项，请重新选择."
@@ -552,26 +551,26 @@ iselect() {
 # iconfirm <message> var
 iconfirm() {
     local message=$1
-    local var=$2
+    local __var=$2
     local input
 
     message=$(rightpadonespace "$(pad "$message" 1 "[y/n]" "right")")
     local text=$(println cyan "$message")
     read -p "$text" input
-    [[ "$input" =~ ^[Yy]$ ]] && eval $var=true || eval $var=false
+    [[ "$input" =~ ^[Yy]$ ]] && eval $__var=true || eval $__var=false
 }
 
 # 交互式输入密码
 # ipassword <message> var
 ipassword() {
     local message=$1
-    local var=$2
+    local __var=$2
     local input
 
     message=$(rightpadonespace "$message")
     local text=$(println cyan "$message")
     read -s -p "$text" input
-    eval $var=$input
+    eval $__var=$input
     printf "\n"
 }
 
@@ -579,12 +578,12 @@ ipassword() {
 # imultiline <message> var
 imultiline() {
     local message=$1
-    local var=$2
+    local __var=$2
     local input
 
     println cyan "$message(Ctrl+D 退出)"
     input=$(cat)
-    eval "$var=\"\$input\""
+    eval "$__var=\"\$input\""
 }
 
 # 私网 IP 地址
@@ -602,7 +601,6 @@ publicip() {
 # 获取IP地址的国家信息
 ip2country() {
     local ip=$(publicip)
-
     local response=$(curl -sS "https://ipinfo.io/${ip}/json")
     local country=$(echo "${response}" | grep -o '"country": *"[^"]*"' | sed 's/"country": *"\([^"]*\)"/\1/')
     printf -- "%s" "${country}"
