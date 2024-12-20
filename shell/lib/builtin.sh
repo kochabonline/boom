@@ -442,16 +442,22 @@ pkg() {
     local os=$(os)
     local cmd
 
-    # 只支持 install, remove
-    if [[ "$flag" != "install" && "$flag" != "remove" ]]; then
-        log error "无效的操作: $flag. 只支持 install, remove."
-    fi
+    case "$flag" in
+        remove)
+            case "$os" in
+                windows|macos) flag="uninstall" ;;
+                alpine) flag="del" ;;
+            esac
+            ;;
+        install)
+            [ "$os" == "alpine" ] && flag="add"
+            ;;
+        *)
+            log error "无效的操作: $flag. 只支持 install, remove."
+            ;;
+    esac
 
-    if [[ "$flag" == "remove" && ("$os" == "windows" || "$os" == "macos") ]]; then
-        flag="uninstall"
-    fi
-
-    case $os in
+    case "$os" in
         windows)
             cmdexs choco || log error "请先安装Chocolatey"
             cmd="choco $flag $package -y"
@@ -475,6 +481,29 @@ pkg() {
     esac
 
     detect $cmd
+}
+
+# json转换关联数组
+# json2array <data> <array>
+json2array() {
+    local data=$1
+    local __array=$2
+    local prefix=$3
+    local result
+    local key
+    local value
+
+    cmdexs jq || pkg install jq
+    result=$(echo $data | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]')
+
+    for item in $result; do
+        key=$(echo $item | cut -d= -f1)
+        value=$(echo $item | cut -d= -f2-)
+        if [[ $value == \{* ]] || [[ $value == \[* ]]; then
+            json2array "$value" $__array "${prefix}${key}."
+        fi
+        eval $__array[${prefix}${key}]=\"$value\"
+    done
 }
 
 # http 请求
@@ -511,29 +540,6 @@ download() {
     local filename=$(basename $url)
     local cmd="wget -q --show-progress --progress=bar:force:noscroll $url -O $filename"
     QUIET=false detect $cmd
-}
-
-# json转换关联数组
-# json2array <data> <array>
-json2array() {
-    local data=$1
-    local __array=$2
-    local prefix=$3
-    local result
-    local key
-    local value
-
-    cmdexs jq || pkg install jq
-    result=$(echo $data | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]')
-
-    for item in $result; do
-        key=$(echo $item | cut -d= -f1)
-        value=$(echo $item | cut -d= -f2-)
-        if [[ $value == \{* ]]; then
-            json2array "$value" $__array "${prefix}${key}."
-        fi
-        eval $__array[${prefix}${key}]=\"$value\"
-    done
 }
 
 # 交互式输入
@@ -618,16 +624,19 @@ privateip() {
 }
 
 # 公网 IP 地址
+# publicip -a|--api <api>
 publicip() {
-    local ip=$(curl -sS https://ipinfo.io/ip)
-    printf -- "%s" "${ip}"
+    args "-a|--api" $@ -d "https://ipinfo.io/ip" -v api
+    printf -- "%s" $(curl -sS $api)
 }
 
 # 获取IP地址的国家信息
-# ip2country <ip>
+# ip2country <ip> -a|--api <api>
 ip2country() {
     local ip=$1
-    local response=$(curl -sS "https://ipinfo.io/${ip}/json")
-    local country=$(echo "${response}" | grep -o '"country": *"[^"]*"' | sed 's/"country": *"\([^"]*\)"/\1/')
+    args "-a|--api" $@ -d "https://ipinfo.io" -v api
+    cmdexs jq || pkg install jq
+    local response=$(curl -sS "${api}/${ip}/json")
+    local country=$(echo "${response}" | jq -r '.country')
     printf -- "%s" "${country}"
 }
