@@ -32,8 +32,7 @@ lower() {
 # 去除两边空格
 trim() {
     local string=$1
-    string=${string%% }
-    string=${string## }
+    string=$(echo "$string" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     printf -- "%s" "$string"
 }
 
@@ -191,7 +190,7 @@ args() {
         case $1 in
             -d|--default)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    default=$2
+                    default=$(printf "%q" "$2")
                     shift
                 fi
                 ;;
@@ -206,7 +205,7 @@ args() {
                 ;;
             *)
                 if [[ "$param" =~ "$1" ]] && [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    value="$2"
+                    value=$(printf "%q" "$2")
                     shift
                 fi
                 ;;
@@ -478,6 +477,32 @@ pkg() {
     detect $cmd
 }
 
+# http 请求
+# http <method> <url> -d|--data <data> -h|--header <header> --response <var>
+http() {
+    local method=$(upper $1)
+    local url=$2
+    local __result
+    args "-d|--data" $@ -v data
+    args "-h|--header" "$@" -d "Content-Type: application/json" -v header
+    args "--response" $@ -v __response
+    
+    [[ $method =~ ^(GET|POST|PUT|DELETE)$ ]] || log error "无效的请求方法: $method, 只支持GET, POST, PUT, DELETE"
+    [ -z "$url" ] && log error "缺少URL参数"
+
+    local cmd="curl -sS -X $method $url"
+    [ -n "$data" ] && cmd="$cmd -d '$data'"
+    if [ -n "$header" ]; then
+        local headers=()
+        IFS=',' read -ra headers <<< "$header"
+        for item in "${headers[@]}"; do
+            cmd="$cmd -H '$(trim "$item")'"
+        done
+    fi
+
+    [ -n "$__response" ] && detect $cmd -v __result && eval $__response=\$__result || detect $cmd
+}
+
 # 下载动态进度条, 使用wget
 # download <url>
 download() {
@@ -599,8 +624,9 @@ publicip() {
 }
 
 # 获取IP地址的国家信息
+# ip2country <ip>
 ip2country() {
-    local ip=$(publicip)
+    local ip=$1
     local response=$(curl -sS "https://ipinfo.io/${ip}/json")
     local country=$(echo "${response}" | grep -o '"country": *"[^"]*"' | sed 's/"country": *"\([^"]*\)"/\1/')
     printf -- "%s" "${country}"
