@@ -433,6 +433,15 @@ random() {
     printf -- "%s" "$string"
 }
 
+# 从字符串或数组中随机选择一个元素
+# randomselect <...string|array>
+randomselect() {
+    local array=($@)
+    local length=${#array[@]}
+    local index=$(($RANDOM % $length))
+    printf -- "%s" "${array[$index]}"
+}
+
 # 包管理器
 # pkg <flag> <package>
 pkg() {
