@@ -39,11 +39,10 @@ trim() {
 # 颜色输出
 # println <color> <message>
 println() {
+    local args=$@
     local color=$(lower $1)
     shift
     local message=$@
-    local length=${#message}
-    [ $length -eq 0 ] && return
 
     case $color in
         black)   printf -- "\033[1;31;30m%b\033[0m\n" "$message" ;;
@@ -54,7 +53,7 @@ println() {
         purple)  printf -- "\033[1;31;35m%b\033[0m\n" "$message" ;;
         cyan)    printf -- "\033[1;31;36m%b\033[0m\n" "$message" ;;
         white)   printf -- "\033[1;31;37m%b\033[0m\n" "$message" ;;
-        *)       printf -- "%b\n" "$message" ;;
+        *)       printf -- "%b\n" "$args" ;;
     esac
 }
 
