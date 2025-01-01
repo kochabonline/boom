@@ -648,3 +648,35 @@ ip2country() {
     local country=$(echo "${response}" | jq -r '.country')
     printf -- "%s" "${country}"
 }
+
+# 批量自动应答ssh-copy-id
+# sshcopyid data -p|--publickey <publickey>
+# data: host password port user
+sshcopyid() {
+    local data=$1
+    local publickey host password port user
+    args "-p|--publickey" $@ -d "$HOME/.ssh/id_rsa.pub" -v publickey
+
+    [ -f "$publickey" ] || log error "$publickey 不存在"
+    cmdexs expect || pkg install expect
+    cmdexs nc || pkg install nc
+    while read -r line; do
+        destruct "$line" host password port user
+        [ -z "$host" ] && log error "缺少主机参数"
+        [ -z "$password" ] && log error "缺少密码参数"
+        [ -z "$port" ] && port=22
+        [ -z "$user" ] && user=root
+
+    # 测试连通性
+    nc -z -w 1 $host $port &> /dev/null || log error "无法连接到主机: $host:$port"
+    # 自动应答
+expect << EOF
+    set timeout 10
+    spawn ssh-copy-id -p $port -i $publickey $user@$host
+    expect {
+        "yes/no" { send "yes\n"; exp_continue }
+        "password:" { stty -echo; send "$password\n"; stty echo }
+    }
+EOF
+    done <<< "$data"
+}
