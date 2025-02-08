@@ -1,15 +1,11 @@
 # 快速开始
 
-```bash
-curl -so- https://raw.githubusercontent.com/kochabonline/script/refs/heads/master/shell/<xx>.sh | bash
-```
-
 ### 本地调用函数库
 
 - 安装函数库
 
 ```bash
-curl -so- https://raw.githubusercontent.com/kochabonline/script/refs/heads/master/shell/install.sh | bash -s -- -i
+curl -so- https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/shell/install.sh | bash -s -- -i
 ```
 
 - 本地脚本添加导入函数
@@ -26,7 +22,7 @@ option $@
 ```bash
 #!/usr/bin/env bash
 
-source <(curl -sS --max-time 10 'https://raw.githubusercontent.com/kochabonline/script/refs/heads/master/shell/lib/builtin.sh')
+source <(curl -sS --max-time 10 'https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/shell/lib/builtin.sh')
 option $@
 ```
 
@@ -59,10 +55,4 @@ extra_option() {
     esac
 }
 option extra_option $@
-```
-
-# Unix风格
-
-```bash
-dos2unix <file>
 ```
