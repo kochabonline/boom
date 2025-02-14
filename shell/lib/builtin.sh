@@ -5,16 +5,19 @@
 # ----------配置区域----------
 # 静默输出
 QUIET=${QUIET:-"true"} # true, false
-# 日志模式
+# 日志参数
+#   日志级别
+LOG_LEVELS=(["debug"]=0 ["info"]=1 ["warn"]=2 ["error"]=3)
+#   日志模式
 LOG_MODE=${LOG_MODE:-"console"} # console, file
-# 日志级别
-declare -A LOG_LEVELS=(["debug"]=0 ["info"]=1 ["warn"]=2 ["error"]=3)
+#   日志级别
 LOG_LEVEL=${LOG_LEVEL:-"info"} # debug, info, warn, error
-# 日志文件
+#   日志文件
 LOG_FILE=${LOG_FILE:-"/var/log/$(basename -s .sh $0).log"}
-# 额外帮助信息
+# 额外参数
+#   帮助信息
 EXTRA_HELP=${EXTRA_HELP:-""}
-# 额外选项处理函数参数偏移量
+#   选项处理函数参数偏移量
 EXTRA_SHIFT=${EXTRA_SHIFT:-""}
 
 
@@ -64,10 +67,10 @@ log() {
     local level=$(lower $1)
     shift
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    local lineno=${BASH_LINENO[0]}
+    local caller=$(basename ${BASH_SOURCE[0]}):${BASH_LINENO[0]}
     local message=$@
-    local color
     local exit_code=0
+    local color
 
     # 日志级别低于设定级别则不输出
     [ ${LOG_LEVELS[$level]} -lt ${LOG_LEVELS[$LOG_LEVEL]} ] && return
@@ -81,8 +84,8 @@ log() {
     esac
 
     case $LOG_MODE in
-        console) println $color "$timestamp [${level^^}] [line: $lineno] $message" ;;
-        file)    println $color "$timestamp [${level^^}] [line: $lineno] $message" >> $LOG_FILE ;;
+        console) println $color "$timestamp [${level^^}] [caller: $caller] $message" ;;
+        file)    println $color "$timestamp [${level^^}] [caller: $caller] $message" >> $LOG_FILE ;;
     esac
 
     [ $exit_code -ne 0 ] && exit $exit_code
@@ -105,8 +108,8 @@ _help() {
     printf -- "  -d, --debug                    调试模式\n"
     printf -- "  -x, --xtrace                   跟踪模式\n"
     printf -- "  -q, --quiet    [true|false]    静默输出\n"
-    printf -- "  -m, --mode     [console|file]  日志模式\n"
-    printf -- "  -f, --file     <file>          日志文件\n"
+    printf -- "  --log-mode     [console|file]  日志模式\n"
+    printf -- "  --log-file     <file>          日志文件\n"
     [ -n "$EXTRA_HELP" ] && printf -- "$EXTRA_HELP"
     exit 0
 }
@@ -143,24 +146,24 @@ option() {
                     log error "-q|--quiet requires a non-empty option argument."
                 fi
                 ;;
-            -m|--mode)
+            --log-mode)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
                     if [[ "$2" =~ ^(console|file)$ ]]; then
                         LOG_MODE="$2"
                         shift 2
                     else
-                        log error "-m|--mode requires 'console' or 'file' as argument."
+                        log error "--log-mode requires 'console' or 'file' as argument."
                     fi
                 else
-                    log error "-m|--mode requires a non-empty option argument."
+                    log error "--log-mode requires a non-empty option argument."
                 fi
                 ;;
-            -f|--file)
+            --log-file)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
                     LOG_FILE=$2
                     shift 2
                 else
-                    log error "-f|--file requires a non-empty option argument."
+                    log error "--log-file requires a non-empty option argument."
                 fi
                 ;;
             *)
@@ -647,6 +650,39 @@ ip2country() {
     local response=$(curl -sS "${api}/${ip}/json")
     local country=$(echo "${response}" | jq -r '.country')
     printf -- "%s" "${country}"
+}
+
+# 校验器
+# validator <rule> <value>
+validator() {
+    local rule=$1
+    local value=$2
+    local pattern
+    local message
+
+    case $rule in
+        email)
+            pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            message="邮箱格式不正确: $value"
+            ;;
+        url)
+            pattern="^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            message="URL格式不正确: $value"
+            ;;
+        ipv4)
+            pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$"
+            message="IPv4格式不正确: $value"
+            ;;
+        ipv6)
+            pattern="^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+            message="IPv6格式不正确: $value"
+            ;;
+        *)
+            log error "无效的校验规则: $rule; 只支持email, url, ipv4, ipv6"
+            ;;
+    esac
+
+    [[ ! "$value" =~ $pattern ]] && log error "$message"
 }
 
 # 批量自动应答ssh-copy-id
