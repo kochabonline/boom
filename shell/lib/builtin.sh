@@ -9,7 +9,7 @@ QUIET=${QUIET:-"true"} # true, false
 #   日志级别
 LOG_LEVELS=(["debug"]=0 ["info"]=1 ["warn"]=2 ["error"]=3)
 #   日志模式
-LOG_MODE=${LOG_MODE:-"console"} # console, file
+LOG_MODE=${LOG_MODE:-"console"} # console, file, multi
 #   日志级别
 LOG_LEVEL=${LOG_LEVEL:-"info"} # debug, info, warn, error
 #   日志文件
@@ -42,7 +42,7 @@ trim() {
 # 颜色输出
 # println <color> <message>
 println() {
-    local args=$@
+    local full=$@
     local color=$(lower $1)
     shift
     local message=$@
@@ -56,7 +56,7 @@ println() {
         purple)  printf -- "\033[1;31;35m%b\033[0m\n" "$message" ;;
         cyan)    printf -- "\033[1;31;36m%b\033[0m\n" "$message" ;;
         white)   printf -- "\033[1;31;37m%b\033[0m\n" "$message" ;;
-        *)       printf -- "%b\n" "$args" ;;
+        *)       printf -- "%b\n" "$full" ;;
     esac
 }
 
@@ -86,6 +86,7 @@ log() {
     case $LOG_MODE in
         console) println $color "$timestamp [${level^^}] [caller: $caller] $message" ;;
         file)    println $color "$timestamp [${level^^}] [caller: $caller] $message" >> $LOG_FILE ;;
+        multi)  println $color "$timestamp [${level^^}] [caller: $caller] $message" | tee -a $LOG_FILE ;;
     esac
 
     [ $exit_code -ne 0 ] && exit $exit_code
@@ -388,6 +389,16 @@ merge() {
     echo -e "${merge[@]}"
 }
 
+# 字符串分割
+# split <string> <delimiter>
+split() {
+    local string=$1
+    local delimiter=${2:-" "}
+    local array
+    IFS=$delimiter read -ra array <<< "$string"
+    printf -- "%s" "${array[@]}"
+}
+
 # 填充
 # pad <string> <length> <char> <side: left|right>
 pad() {
@@ -666,8 +677,12 @@ validator() {
             message="邮箱格式不正确: $value"
             ;;
         url)
-            pattern="^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            pattern="^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/[a-zA-Z0-9._%+-]*)*(\?[a-zA-Z0-9._%+-=&]*)?$"
             message="URL格式不正确: $value"
+            ;;
+        domain)
+            pattern="^([a-zA-Z0-9-]+\.){1,}([a-zA-Z0-9-]+)$"
+            message="域名格式不正确: $value"
             ;;
         ipv4)
             pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$"
@@ -678,7 +693,7 @@ validator() {
             message="IPv6格式不正确: $value"
             ;;
         *)
-            log error "无效的校验规则: $rule; 只支持email, url, ipv4, ipv6"
+            log error "无效的校验规则: $rule"
             ;;
     esac
 
