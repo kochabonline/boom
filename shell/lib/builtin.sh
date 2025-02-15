@@ -115,10 +115,10 @@ _help() {
     exit 0
 }
 # 选项处理
-# option [extra_option] <options>
-option() {
-    local extra_option=$1
-    if declare -F $extra_option &> /dev/null; then
+# argparse [extra_argparse] <options>
+argparse() {
+    local extra_argparse=$1
+    if declare -F $extra_argparse &> /dev/null; then
         shift
     fi
 
@@ -149,11 +149,11 @@ option() {
                 ;;
             --log-mode)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    if [[ "$2" =~ ^(console|file)$ ]]; then
+                    if [[ "$2" =~ ^(console|file|multi)$ ]]; then
                         LOG_MODE="$2"
                         shift 2
                     else
-                        log error "--log-mode requires 'console' or 'file' as argument."
+                        log error "--log-mode requires 'console' or 'file' or 'multi' as argument."
                     fi
                 else
                     log error "--log-mode requires a non-empty option argument."
@@ -177,7 +177,7 @@ option() {
                 ;;
         esac
     done
-}; [[ ${BASH_SOURCE[0]} == ${0} ]] && option $@
+}; [[ ${BASH_SOURCE[0]} == ${0} ]] && argparse $@
 
 # 参数解析
 # args <param> <args> -d|--default <default> -v|--var <var> -r|--required
@@ -492,7 +492,7 @@ pkg() {
             cmd="apt-get update; apt-get $flag $package -y"
             ;;
         centos|rocky|fedora|rhel)
-            cmd="yum $flag $package -y"
+            cmdexs dnf && cmd="dnf $flag $package -y" || cmd="yum $flag $package -y"
             ;;
         alpine)
             cmd="apk update; apk $flag $package"

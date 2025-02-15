@@ -14,7 +14,7 @@ curl -so- https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/
 #!/usr/bin/env bash
 
 source /usr/local/lib/kochab/shell/lib/builtin.sh
-option $@
+argparse $@
 ```
 
 #### 远程调用函数库
@@ -23,10 +23,10 @@ option $@
 #!/usr/bin/env bash
 
 source <(curl -sS --max-time 10 'https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/shell/lib/builtin.sh')
-option $@
+argparse $@
 ```
 
-### 扩展option函数
+### 扩展argparse函数
 
 ```bash
 # 扩展帮助信息
@@ -35,7 +35,7 @@ ANOTHER=""
 EXTRA_HELP="  -e, --extra    <arg>           extra argument
   -a, --another  <arg>           another argument
 "
-extra_option() {
+extra_argparse() {
     case $1 in
         -e|--extra)
             EXTRA="true"
@@ -54,5 +54,5 @@ extra_option() {
             ;;
     esac
 }
-option extra_option $@
+argparse extra_argparse $@
 ```
