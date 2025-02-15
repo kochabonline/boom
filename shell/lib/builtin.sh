@@ -168,7 +168,7 @@ argparse() {
                 fi
                 ;;
             *)
-                if $extra_option $@; then
+                if $extra_argparse $@; then
                     [ -n "$EXTRA_SHIFT" ] && shift $EXTRA_SHIFT
                     [ -z "$EXTRA_SHIFT" ] && shift
                 else
