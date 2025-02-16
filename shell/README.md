@@ -13,7 +13,13 @@ curl -so- https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/
 ```bash
 #!/usr/bin/env bash
 
-source /usr/local/lib/kochab/shell/lib/builtin.sh
+import() {
+    local lib="/usr/local/lib/kochab/shell/lib/builtin.sh"
+    [[ -f ${lib} ]] || {
+        curl -so- https://raw.githubusercontent.com/kochabonline/boom/refs/heads/master/shell/install.sh | bash -s -- -i
+    }
+    source ${lib}
+}; import
 argparse $@
 ```
 

@@ -22,6 +22,16 @@ EXTRA_SHIFT=${EXTRA_SHIFT:-""}
 
 
 # ----------内置函数----------
+# 当前时间
+now() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+# 时间戳
+timestamp() {
+    date "+%s"
+}
+
 # 字符串转换为大写
 upper() {
     printf -- "%s" "$1" | tr '[:lower:]' '[:upper:]'
@@ -66,8 +76,8 @@ log() {
     local xtrace=$(shopt -po xtrace); set +x
     local level=$(lower $1)
     shift
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    local caller=$(basename ${BASH_SOURCE[0]}):${BASH_LINENO[0]}
+    local timestamp=$(now)
+    local caller=$(caller)
     local message=$@
     local exit_code=0
     local color
@@ -105,12 +115,12 @@ _exit() {
 _help() {
     printf -- "Usage: $0 [options]\n\n"
     printf -- "Options:\n"
-    printf -- "  -h, --help                     帮助信息\n"
-    printf -- "  -d, --debug                    调试模式\n"
-    printf -- "  -x, --xtrace                   跟踪模式\n"
-    printf -- "  -q, --quiet    [true|false]    静默输出\n"
-    printf -- "  --log-mode     [console|file]  日志模式\n"
-    printf -- "  --log-file     <file>          日志文件\n"
+    printf -- "  -h, --help                         帮助信息\n"
+    printf -- "  -d, --debug                        调试模式\n"
+    printf -- "  -x, --xtrace                       跟踪模式\n"
+    printf -- "  -q, --quiet                        静默输出\n"
+    printf -- "  --log-mode <console|file|multi>    日志模式\n"
+    printf -- "  --log-file <file>                  日志文件\n"
     [ -n "$EXTRA_HELP" ] && printf -- "$EXTRA_HELP"
     exit 0
 }
@@ -140,7 +150,7 @@ argparse() {
                     if [[ "$2" =~ ^(true|false)$ ]]; then
                         QUIET="$2"
                         shift 2
-                    else 
+                    else
                         log error "-q|--quiet requires 'true' or 'false' as argument."
                     fi
                 else
@@ -180,6 +190,7 @@ argparse() {
 }; [[ ${BASH_SOURCE[0]} == ${0} ]] && argparse $@
 
 # 参数解析
+# 要想参数中能够带有空格，需要用双引号包裹$@; 例如: args "--name" "$@"
 # args <param> <args> -d|--default <default> -v|--var <var> -r|--required
 args() {
     local param=$1
@@ -193,7 +204,7 @@ args() {
         case $1 in
             -d|--default)
                 if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    default=$(printf "%q" "$2")
+                    default=$(printf "%s" "$2")
                     shift
                 fi
                 ;;
@@ -208,7 +219,7 @@ args() {
                 ;;
             *)
                 if [[ "$param" =~ "$1" ]] && [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    value=$(printf "%q" "$2")
+                    value=$(printf "%s" "$2")
                     shift
                 fi
                 ;;
@@ -528,15 +539,49 @@ json2array() {
     done
 }
 
+# toml
+# toml <file> <add|del|get|set> <key> [value]
+toml() {
+    local file=$1
+    local action=$2
+    local key=$3
+    local value=$4
+    local result
+
+    [[ -f $file ]] || log error "文件不存在: $file"
+    case $action in
+        add)
+            printf "%s=%s\n" "$key" "$value" >> $file
+            ;;
+        del)
+            sed -i "/^\s*$key\s*=/d" $file
+            ;;
+        get)
+            result=$(grep -E "^\s*$key\s*=" $file | cut -d= -f2-)
+            printf -- "%s" $(trim "$result")
+            ;;
+        set)
+            if grep -qE "^\s*$key\s*=" $file; then
+                sed -i "s/^\s*$key\s*=.*/$key=$value/" $file
+            else
+                printf "%s=%s\n" "$key" "$value" >> $file
+            fi
+            ;;
+        *)
+            log error "无效的操作: $action"
+            ;;
+    esac
+}
+
 # http 请求
 # http <method> <url> -d|--data <data> -h|--header <header> --response <var>
 http() {
     local method=$(upper $1)
     local url=$2
     local __result
-    args "-d|--data" $@ -v data
+    args "-d|--data" "$@" -v data
     args "-h|--header" "$@" -d "Content-Type: application/json" -v header
-    args "--response" $@ -v __response
+    args "--response" "$@" -v __response
     
     [[ $method =~ ^(GET|POST|PUT|DELETE)$ ]] || log error "无效的请求方法: $method, 只支持GET, POST, PUT, DELETE"
     [ -z "$url" ] && log error "缺少URL参数"
@@ -572,7 +617,7 @@ input() {
     shift 2
     local input
 
-    local default=$(args "-d|--default" $@)
+    local default=$(args "-d|--default" "$@")
     message=$(rightpadonespace "$message")
     local text=$(println cyan "$message")
     read -p "$text" input
@@ -648,7 +693,7 @@ privateip() {
 # 公网 IP 地址
 # publicip -a|--api <api>
 publicip() {
-    args "-a|--api" $@ -d "https://ipinfo.io/ip" -v api
+    args "-a|--api" "$@" -d "https://ipinfo.io/ip" -v api
     printf -- "%s" $(curl -sS $api)
 }
 
@@ -656,7 +701,7 @@ publicip() {
 # ip2country <ip> -a|--api <api>
 ip2country() {
     local ip=$1
-    args "-a|--api" $@ -d "https://ipinfo.io" -v api
+    args "-a|--api" "$@" -d "https://ipinfo.io" -v api
     cmdexs jq || pkg install jq
     local response=$(curl -sS "${api}/${ip}/json")
     local country=$(echo "${response}" | jq -r '.country')
@@ -700,13 +745,25 @@ validator() {
     [[ ! "$value" =~ $pattern ]] && log error "$message"
 }
 
+# 时间差
+# timesub <time1> <time2>
+timesub() {
+    local time1
+    local time2
+
+    data -d $1 > /dev/null && time1=$(date -d "$1" +%s) || log error "无效日期: $1"
+    data -d $2 > /dev/null && time2=$(date -d "$2" +%s) || log error "无效日期: $2"
+
+    printf -- "%s" $((time1 - time2))
+}
+
 # 批量自动应答ssh-copy-id
 # sshcopyid data -p|--publickey <publickey>
 # data: host password port user
 sshcopyid() {
     local data=$1
     local publickey host password port user
-    args "-p|--publickey" $@ -d "$HOME/.ssh/id_rsa.pub" -v publickey
+    args "-p|--publickey" "$@" -d "$HOME/.ssh/id_rsa.pub" -v publickey
 
     [ -f "$publickey" ] || log error "$publickey 不存在"
     cmdexs expect || pkg install expect
